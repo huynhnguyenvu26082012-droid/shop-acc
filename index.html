@@ -125,7 +125,8 @@
         canvas {
             border-radius: 50%;
             box-shadow: 0 0 20px rgba(56, 189, 248, 0.2);
-            transition: transform 4s cubic-bezier(0.15, 0.99, 0.35, 1);
+            /* Thời gian quay 30 giây cực kịch tính */
+            transition: transform 30s cubic-bezier(0.1, 0.85, 0.15, 1);
         }
 
         .btn-spin {
@@ -216,11 +217,12 @@
         // ==============================================================
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxPnB6Vk1TKgB146Q3trQIyWOjb6lpxvW6YxU3m3Lnypy7AF4xvjyfJVVs4nA2vDG7Dkg/exec";
 
+        // Cấu hình tỷ lệ trúng mới
         const khoAcc = [
-            { loai: "Acc VIP SS",   tyLe: 10, color: "#f59e0b" },
-            { loai: "Acc VIP Vừa",  tyLe: 20, color: "#0284c7" },
-            { loai: "Acc Random",   tyLe: 40, color: "#8b5cf6" },
-            { loai: "Voucher 20%",  tyLe: 30, color: "#10b981" }
+            { loai: "Acc VIP SS",   tyLe: 5,  color: "#f59e0b" }, // 5%
+            { loai: "Acc VIP Vừa",  tyLe: 5,  color: "#0284c7" }, // 5%
+            { loai: "Acc Random",   tyLe: 50, color: "#8b5cf6" }, // 50%
+            { loai: "Voucher 20%",  tyLe: 40, color: "#10b981" }  // 40%
         ];
 
         const canvas = document.getElementById('wheelCanvas');
@@ -234,8 +236,49 @@
         let isSpinning = false;
         let isKeyValid = false;
         let checkTimeout = null;
+        let soundInterval = null;
         const numSlices = khoAcc.length;
         const sliceAngle = 360 / numSlices;
+
+        // BỘ TẠO ÂM THANH (WEB AUDIO API)
+        let audioCtx = null;
+
+        function playTickSound() {
+            try {
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(120, audioCtx.currentTime + 0.03);
+                gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.03);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.03);
+            } catch (e) {}
+        }
+
+        function playWinSound() {
+            try {
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const now = audioCtx.currentTime;
+                [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.value = freq;
+                    gain.gain.setValueAtTime(0.2, now + i * 0.12);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.12 + 0.4);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now + i * 0.12);
+                    osc.stop(now + i * 0.12 + 0.4);
+                });
+            } catch (e) {}
+        }
 
         // KIỂM TRA KEY TRÊN GOOGLE SHEETS
         function checkKeyWithServer() {
@@ -322,7 +365,31 @@
             return pool[Math.floor(Math.random() * pool.length)];
         }
 
-        // HÀM QUAY
+        // HÀM TẠO TIẾNG TẠCH TẠCH CHẬM DẦN THEO 30S
+        function startSpinSound() {
+            let lastAngle = 0;
+            let checkSound = () => {
+                if (!isSpinning) return;
+                const st = window.getComputedStyle(canvas);
+                const tr = st.getPropertyValue("transform");
+                if (tr && tr !== "none") {
+                    const values = tr.split('(')[1].split(')')[0].split(',');
+                    const a = parseFloat(values[0]);
+                    const b = parseFloat(values[1]);
+                    let angle = Math.atan2(b, a) * (180 / Math.PI);
+                    if (angle < 0) angle += 360;
+                    
+                    if (Math.abs(angle - lastAngle) >= 30) {
+                        playTickSound();
+                        lastAngle = angle;
+                    }
+                }
+                soundInterval = requestAnimationFrame(checkSound);
+            };
+            soundInterval = requestAnimationFrame(checkSound);
+        }
+
+        // HÀM QUAY 30 GIÂY
         function spinWheel() {
             if (isSpinning || !isKeyValid) return;
             
@@ -332,7 +399,6 @@
             keyInput.disabled = true;
             resultBox.style.display = 'none';
 
-            // GỬI YÊU CẦU KHÓA KEY TRÊN GOOGLE SHEETS DƯỚI BACKEND
             fetch(`${SCRIPT_URL}?key=${encodeURIComponent(userKey)}&action=use`)
             .then(res => res.json())
             .then(data => {
@@ -342,11 +408,11 @@
                     return;
                 }
 
-                // QUAY VÒNG QUAY
+                // TÍNH GÓC QUAY 35 VÒNG (30 GIÂY)
                 const winningIndex = getRewardIndexByRate();
                 const sliceCenterAngle = (winningIndex * sliceAngle) + (sliceAngle / 2);
                 const stopAngle = 360 - sliceCenterAngle;
-                const extraRounds = 5 * 360;
+                const extraRounds = 35 * 360; // Quay 35 vòng
                 
                 const nextRotation = currentRotation + extraRounds + (stopAngle - (currentRotation % 360));
                 const finalRotation = (nextRotation <= currentRotation) ? nextRotation + 360 : nextRotation;
@@ -354,8 +420,15 @@
                 currentRotation = finalRotation;
                 canvas.style.transform = `rotate(${finalRotation}deg)`;
 
+                // KÍCH HOẠT ÂM THANH
+                startSpinSound();
+
+                // DỪNG LẠI ĐÚNG SAU 30 GIÂY (30000ms)
                 setTimeout(() => {
                     isSpinning = false;
+                    cancelAnimationFrame(soundInterval);
+                    playWinSound(); // Nhạc chiến thắng
+
                     keyInput.disabled = false;
                     keyInput.value = "";
                     keyStatus.innerHTML = "<b style='color:#f59e0b;'>⚠️ Key đã được gạch thẻ thành công. Nhập Key mới để quay tiếp!</b>";
@@ -370,7 +443,7 @@
                         <b>Tài khoản / Mật khẩu:</b> Liên hệ Admin để nhận Nick
                     `;
                     resultBox.style.display = 'block';
-                }, 4000);
+                }, 30000);
             });
         }
     </script>
