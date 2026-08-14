@@ -167,14 +167,14 @@
 
     <script>
         // ==============================================================
-        // DANH SÁCH MÓN QUÀ VÀ TỶ LỆ TRÚNG (Tổng tỷ lệ = 100)
-        // Bạn có thể sửa TK / MK / tyLe ở đây!
+        // KHO ACC & PHẦN THƯỞNG (TỔNG TỶ LỆ = 100)
+        // Sửa TK / MK / Tỷ Lệ (tyLe) trực tiếp tại đây
         // ==============================================================
         const khoAcc = [
-            { loai: "Acc VIP SS",   tk: "acc_ss_100k", mk: "passvip999", tyLe: 10, color: "#f59e0b" }, // 10%
-            { loai: "Acc VIP Vừa",  tk: "acc_vua_50k", mk: "passvua123", tyLe: 20, color: "#0284c7" }, // 20%
-            { loai: "Acc Random",   tk: "acc_rand_20k",mk: "passrand789",tyLe: 40, color: "#8b5cf6" }, // 40%
-            { loai: "Voucher 20%",  tk: "MÃ VC:",      mk: "VC20-DISCOUNT", tyLe: 30, color: "#10b981" } // 30%
+            { loai: "Acc VIP SS",   tk: "acc_ss_100k",  mk: "passvip999",   tyLe: 10, color: "#f59e0b" }, // 10%
+            { loai: "Acc VIP Vừa",  tk: "acc_vua_50k",  mk: "passvua123",   tyLe: 20, color: "#0284c7" }, // 20%
+            { loai: "Acc Random",   tk: "acc_rand_20k", mk: "passrand789",  tyLe: 40, color: "#8b5cf6" }, // 40%
+            { loai: "Voucher 20%",  tk: "MÃ VC:",       mk: "VC20-DISCOUNT",tyLe: 30, color: "#10b981" }  // 30%
         ];
 
         const canvas = document.getElementById('wheelCanvas');
@@ -182,12 +182,12 @@
         const spinBtn = document.getElementById('spinBtn');
         const resultBox = document.getElementById('resultBox');
         
-        let currentAngle = 0; // Góc xoay hiện tại (tính bằng độ)
+        let currentRotation = 0; // Tích lũy góc quay tổng cộng
         let isSpinning = false;
         const numSlices = khoAcc.length;
-        const sliceAngle = 360 / numSlices; // 90 độ mỗi ô
+        const sliceAngle = 360 / numSlices; // 90 độ / ô
 
-        // Vẽ vòng quay chuẩn tọa độ (Góc 0 độ ở đỉnh - hướng 12h)
+        // Vẽ bánh xe
         function drawWheel() {
             const centerX = canvas.width / 2;
             const centerY = canvas.height / 2;
@@ -196,7 +196,7 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             for (let i = 0; i < numSlices; i++) {
-                // Đổi độ sang Radian, căn chỉnh góc bắt đầu từ kim chỉ đỉnh (270 độ / -90 độ)
+                // Vẽ từ đỉnh (12h - tức -90 độ) theo chiều kim đồng hồ
                 const startAngle = (i * sliceAngle - 90) * Math.PI / 180;
                 const endAngle = ((i + 1) * sliceAngle - 90) * Math.PI / 180;
 
@@ -211,7 +211,7 @@
                 ctx.lineWidth = 3;
                 ctx.stroke();
 
-                // Vẽ Chữ
+                // Vẽ chữ giữa ô
                 ctx.save();
                 ctx.translate(centerX, centerY);
                 const middleAngle = startAngle + (sliceAngle * Math.PI / 360);
@@ -225,7 +225,7 @@
         }
         drawWheel();
 
-        // Thuật toán chọn kết quả theo tỷ lệ % chuẩn
+        // Thuật toán chọn chỉ số theo Tỷ lệ %
         function getRewardIndexByRate() {
             let pool = [];
             khoAcc.forEach((item, index) => {
@@ -237,30 +237,36 @@
             return pool[rand];
         }
 
-        // Hàm Quay
+        // Hàm Quay chuẩn góc 100%
         function spinWheel() {
             if (isSpinning) return;
             isSpinning = true;
             spinBtn.disabled = true;
             resultBox.style.display = 'none';
 
-            // 1. Chọn món quà theo tỉ lệ %
+            // 1. Chọn món quà theo tỷ lệ %
             const winningIndex = getRewardIndexByRate();
 
-            // 2. Tính toán chính xác góc quay để KIM ĐỎ DỪNG ĐÚNG Ô ĐÓ
-            // Ô i chiếm từ (i * sliceAngle) đến ((i+1) * sliceAngle)
-            // Cần quay bánh xe ngược chiều để ô đó nằm dưới kim đỏ
-            const targetSliceCenter = (winningIndex * sliceAngle) + (sliceAngle / 2);
-            
-            // Xoay thêm ít nhất 5 vòng (5 * 360 = 1800) + tính góc lệch
+            // 2. Tính góc quay chuẩn:
+            // Kim đỏ ở trên cùng (12h) tương ứng với góc 0 deg của container
+            // Ô thứ i nằm trong khoảng góc [i * 90, (i+1) * 90] tính theo chiều kim đồng hồ.
+            // Để đưa giữa ô thứ i lên vị trí 12h, ta cần quay bánh xe một góc theo chiều kim đồng hồ:
+            // Angle = 360 - (i * 90 + 45)
+            const sliceCenterAngle = (winningIndex * sliceAngle) + (sliceAngle / 2);
+            const stopAngle = 360 - sliceCenterAngle;
+
+            // Cộng thêm ít nhất 5 vòng quay (5 * 360)
             const extraRounds = 5 * 360;
-            const targetRotation = extraRounds + (360 - targetSliceCenter);
+            
+            // Tính tổng độ quay mới dựa trên góc hiện tại
+            const nextRotation = currentRotation + extraRounds + (stopAngle - (currentRotation % 360));
+            // Đảm bảo luôn quay tiến tới (không bị giật lùi)
+            const finalRotation = (nextRotation <= currentRotation) ? nextRotation + 360 : nextRotation;
 
-            // Cộng dồn vào góc hiện tại
-            currentAngle += targetRotation - (currentAngle % 360);
-            canvas.style.transform = `rotate(${currentAngle}deg)`;
+            currentRotation = finalRotation;
+            canvas.style.transform = `rotate(${finalRotation}deg)`;
 
-            // 3. Sau khi kết thúc animation (4 giây)
+            // 3. Sau 4 giây hoàn thành quay
             setTimeout(() => {
                 isSpinning = false;
                 spinBtn.disabled = false;
