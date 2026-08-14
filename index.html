@@ -122,7 +122,6 @@
             box-shadow: 0 10px 25px rgba(0,0,0,0.08);
         }
 
-        /* KIM ĐỎ VỚI HIỆU ỨNG NẢY KHI CHẠM RANH GIỚI Ô */
         .pointer {
             position: absolute;
             top: -14px;
@@ -139,7 +138,6 @@
             transition: transform 0.04s ease-out;
         }
 
-        /* Lớp CSS giúp kim giật nhẹ khi cạch */
         .pointer.tick {
             transform: translateX(-50%) rotate(-15deg);
         }
@@ -176,7 +174,6 @@
             cursor: not-allowed;
         }
 
-        /* POPUP KẾT QUẢ */
         .modal-overlay {
             display: none;
             position: fixed;
@@ -278,11 +275,14 @@
         // ==============================================================
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxPnB6Vk1TKgB146Q3trQIyWOjb6lpxvW6YxU3m3Lnypy7AF4xvjyfJVVs4nA2vDG7Dkg/exec";
 
+        // DANH SÁCH 6 PHẦN THƯỞNG VỚI TỶ LỆ CHUẨN 100%
         const khoAcc = [
-            { loai: "Acc VIP SS",   tyLe: 5,  color: "#f59e0b" },
-            { loai: "Acc VIP Vừa",  tyLe: 5,  color: "#0284c7" },
-            { loai: "Acc Random",   tyLe: 50, color: "#8b5cf6" },
-            { loai: "Voucher 20%",  tyLe: 40, color: "#10b981" }
+            { loai: "Acc Skin S+",     tyLe: 20, color: "#2563eb" }, // Xanh dương
+            { loai: "Acc Skin SS",     tyLe: 2,  color: "#d97706" }, // Vàng Gold (Cực hiếm)
+            { loai: "Acc QH Ngẫu Nhiên",tyLe: 10, color: "#7c3aed" }, // Tím
+            { loai: "Acc Reg Ngẫu Nhiên",tyLe: 30, color: "#64748b" }, // Xám xịn
+            { loai: "Giảm Giá 5%",      tyLe: 37, color: "#059669" }, // Xanh lá
+            { loai: "40 Quân Huy",     tyLe: 1,  color: "#dc2626" }  // Đỏ (Cực hiếm)
         ];
 
         const canvas = document.getElementById('wheelCanvas');
@@ -301,7 +301,6 @@
         const numSlices = khoAcc.length;
         const sliceAngle = 360 / numSlices;
 
-        // BỘ ÂM THANH "CẠCH" CƠ KHÍ GIỐNG WHEEL OF NAMES 100%
         let audioCtx = null;
 
         function playTickSound() {
@@ -309,7 +308,6 @@
                 if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 if (audioCtx.state === 'suspended') audioCtx.resume();
                 
-                // Tiếng đập "Cạch" đục và giòn
                 const osc = audioCtx.createOscillator();
                 const gain = audioCtx.createGain();
                 
@@ -326,9 +324,8 @@
                 osc.start();
                 osc.stop(audioCtx.currentTime + 0.015);
 
-                // Hiệu ứng kim đỏ nảy rung
                 pointer.classList.remove('tick');
-                void pointer.offsetWidth; // Trigger reflow
+                void pointer.offsetWidth;
                 pointer.classList.add('tick');
                 setTimeout(() => pointer.classList.remove('tick'), 40);
 
@@ -354,7 +351,6 @@
             } catch (e) {}
         }
 
-        // KIỂM TRA KEY TRÊN GOOGLE SHEETS
         function checkKeyWithServer() {
             if (isSpinning) return;
             const userKey = keyInput.value.trim();
@@ -393,7 +389,7 @@
             }, 500);
         }
 
-        // VẼ BÁNH XE
+        // VẼ 6 Ô BÁNH XE
         function drawWheel() {
             const centerX = canvas.width / 2;
             const centerY = canvas.height / 2;
@@ -413,7 +409,7 @@
                 ctx.fill();
 
                 ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 4;
+                ctx.lineWidth = 3;
                 ctx.stroke();
 
                 ctx.save();
@@ -422,8 +418,8 @@
                 ctx.rotate(middleAngle);
                 ctx.textAlign = "right";
                 ctx.fillStyle = "#ffffff";
-                ctx.font = "bold 14px sans-serif";
-                ctx.fillText(khoAcc[i].loai, radius - 20, 5);
+                ctx.font = "bold 12px sans-serif";
+                ctx.fillText(khoAcc[i].loai, radius - 15, 4);
                 ctx.restore();
             }
         }
@@ -439,7 +435,6 @@
             return pool[Math.floor(Math.random() * pool.length)];
         }
 
-        // BẮT CHÍNH XÁC KHOẢNH KHẮC CẮT BỞI RANH GIỚI Ô ĐỂ PHÁT TIẾNG CẠCH
         function startSpinSound() {
             let lastSliceIndex = -1;
             
@@ -454,7 +449,6 @@
                     let angle = Math.atan2(b, a) * (180 / Math.PI);
                     if (angle < 0) angle += 360;
                     
-                    // Tính ô hiện tại đang nằm dưới kim đỏ (đặt ở góc 270 độ / top)
                     let currentSlice = Math.floor(((360 - angle) % 360) / sliceAngle);
                     
                     if (currentSlice !== lastSliceIndex) {
@@ -467,7 +461,6 @@
             soundInterval = requestAnimationFrame(checkSound);
         }
 
-        // HÀM QUAY
         function spinWheel() {
             if (isSpinning || !isKeyValid) return;
             
